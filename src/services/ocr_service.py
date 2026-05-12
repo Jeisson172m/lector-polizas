@@ -1,63 +1,69 @@
 import os
 import gc
-import subprocess
-import tempfile
+import re
+import pdfplumber
+from PIL import Image
 
 try:
     import pytesseract
+    import pdf2image
     TESSERACT_AVAILABLE = True
 except ImportError:
     TESSERACT_AVAILABLE = False
 
 class OCRService:
-    def __init__(self, dpi=150):
+    def __init__(self, dpi=200):
         self.dpi = dpi
 
     def extract_text_from_pdf(self, pdf_path):
-        if not TESSERACT_AVAILABLE:
-            return ''
-        
         text_pages = []
         
         try:
-            with tempfile.TemporaryDirectory() as tmpdir:
-                output_prefix = os.path.join(tmpdir, 'page')
-                
-                result = subprocess.run([
-                    'pdftoppm',
-                    '-r', str(self.dpi),
-                    '-jpeg',
-                    '-jpegopt', 'quality=70',
-                    '-f', '1',
-                    '-l', '10',
-                    pdf_path,
-                    output_prefix
-                ], capture_output=True, text=True, timeout=60)
-                
-                if result.returncode != 0:
-                    return ''
-                
-                pages = sorted([f for f in os.listdir(tmpdir) if f.startswith('page')])
-                
-                for page_file in pages:
-                    page_path = os.path.join(tmpdir, page_file)
-                    try:
-                        text = pytesseract.image_to_string(page_path, lang='spa', config='--psm 1')
+            with pdfplumber.open(pdf_path) as pdf:
+                max_pages = min(len(pdf.pages), 3)
+                for i in range(max_pages):
+                    page = pdf.pages[i]
+                    text = page.extract_text()
+                    if text and len(text.strip()) > 50:
                         text_pages.append(text)
-                    except:
-                        pass
-                    finally:
-                        del page_path
-                
-                del pages
-                gc.collect()
-                
-        except Exception as e:
-            print(f'OCR error: {str(e)}')
-            return ''
+        except:
+            pass
+        
+        if not text_pages or all(page.strip() == '' for page in text_pages):
+            if TESSERACT_AVAILABLE:
+                text_pages = self._extract_with_tesseract(pdf_path)
         
         result = '\n\n--- PAGE BREAK ---\n\n'.join(text_pages)
         del text_pages
         gc.collect()
-        
         return result
+
+    def _extract_with_tesseract(self, pdf_path):
+        text_pages = []
+        images = None
+        
+        try:
+            with open(pdf_path, 'rb') as f:
+                pdf_bytes = f.read()
+            
+            images = pdf2image.convert_from_bytes(
+                pdf_bytes,
+                dpi=self.dpi,
+                fmt='png',
+                thread_count=1,
+                max_section=3
+            )
+            del pdf_bytes
+            
+            for img in images[:3]:
+                text = pytesseract.image_to_string(img, lang='spa')
+                text_pages.append(text)
+                
+        except Exception as e:
+            print(f'Tesseract error: {str(e)}')
+        finally:
+            if images:
+                del images
+            gc.collect()
+        
+        return text_pages
