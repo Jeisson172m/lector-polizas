@@ -210,6 +210,16 @@ class ExcelService:
         if any(x in col_name.upper() for x in ['VALOR', 'PRIMA']):
             if isinstance(val, (int, float)):
                 return f'{val:,.0f}'.replace(',', '.')
+            return str(val)
+
+        if any(x in col_name.upper() for x in ['POLIZA', 'TOMADOR', 'ASEGURADO', 'NIT']):
+            if isinstance(val, float):
+                if val == int(val):
+                    return str(int(val))
+                return str(val)
+            if isinstance(val, int):
+                return str(val)
+            return str(val).strip()
 
         return str(val)
 
