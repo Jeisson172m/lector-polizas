@@ -301,7 +301,15 @@
 
             try {
                 const response = await fetch('/upload', { method: 'POST', body: formData });
-                const data = await response.json();
+
+                const contentType = response.headers.get('content-type');
+                let data;
+                if (contentType && contentType.includes('application/json')) {
+                    data = await response.json();
+                } else {
+                    const text = await response.text();
+                    throw new Error('Error del servidor: ' + (text.substring(0, 200)));
+                }
 
                 if (data.success) {
                     processedResults = data.results;
@@ -312,7 +320,7 @@
                         document.getElementById('comparisonBtn').style.display = 'inline-block';
                     }
                 } else {
-                    alert('Error: ' + data.error);
+                    alert('Error: ' + (data.error || 'Error desconocido'));
                 }
             } catch (error) {
                 alert('Error al procesar: ' + error.message);
@@ -477,21 +485,26 @@
             const kpiGrid = document.getElementById('kpiGrid');
             const fieldBreakdown = document.getElementById('fieldBreakdown');
 
+            const totalComparados = kpis.resumen_campos ? kpis.resumen_campos.reduce((sum, f) => sum + (f.total || 0), 0) : 0;
+            const totalCoincidentes = kpis.resumen_campos ? kpis.resumen_campos.reduce((sum, f) => sum + (f.ok || 0), 0) : 0;
+            const pctCoincidencia = totalComparados > 0 ? Math.round((totalCoincidentes / totalComparados) * 100) : 0;
+            const sinCoincidencia = (kpis.diferencias_encontradas || 0) + (kpis.sin_coincidencia_excel || 0) + (kpis.con_errores || 0);
+
             let gridHtml = `
                 <div class="kpi-card info">
                     <div class="kpi-value">${kpis.total_procesados || 0}</div>
                     <div class="kpi-label">Archivos Procesados</div>
                 </div>
                 <div class="kpi-card success">
-                    <div class="kpi-value">${kpis.porcentaje_coincidencia || 0}%</div>
+                    <div class="kpi-value">${pctCoincidencia}%</div>
                     <div class="kpi-label">% Coincidencia Total</div>
                 </div>
                 <div class="kpi-card warning">
-                    <div class="kpi-value">${kpis.total_no_coincidentes || 0}</div>
-                    <div class="kpi-label">Campos Sin Coincidencia</div>
+                    <div class="kpi-value">${sinCoincidencia}</div>
+                    <div class="kpi-label">Con Diferencias</div>
                 </div>
                 <div class="kpi-card">
-                    <div class="kpi-value">${kpis.total_comparados || 0}</div>
+                    <div class="kpi-value">${totalComparados}</div>
                     <div class="kpi-label">Campos Comparados</div>
                 </div>
             `;
@@ -500,11 +513,12 @@
             if (kpis.resumen_campos && kpis.resumen_campos.length > 0) {
                 let breakdownHtml = '<h4>Desglose por Campo</h4>';
                 kpis.resumen_campos.forEach(item => {
-                    let pctClass = item.porcentaje >= 80 ? 'high' : (item.porcentaje >= 50 ? 'medium' : 'low');
+                    const pct = item.porcentaje_ok || 0;
+                    let pctClass = pct >= 80 ? 'high' : (pct >= 50 ? 'medium' : 'low');
                     breakdownHtml += `
                         <div class="field-item">
                             <span class="field-name">${item.campo}</span>
-                            <span class="field-pct ${pctClass}">${item.porcentaje}% (${item.coincidentes}/${item.total})</span>
+                            <span class="field-pct ${pctClass}">${pct}% (OK: ${item.ok || 0} | Dif: ${item.diferencia || 0} | Sin datos: ${item.sin_datos || 0})</span>
                         </div>
                     `;
                 });
