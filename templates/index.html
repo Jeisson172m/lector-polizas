@@ -290,37 +290,51 @@
                 return;
             }
 
-            const formData = new FormData();
-            for (let i = 0; i < files.length; i++) {
-                formData.append('files', files[i]);
-            }
-            formData.append('aseguradora', aseguradora);
-
             document.getElementById('loading').style.display = 'block';
             document.getElementById('processBtn').disabled = true;
+            document.getElementById('results').style.display = 'none';
+
+            processedResults = [];
+            const batchSize = 5;
+            let totalBatches = Math.ceil(files.length / batchSize);
+            let currentBatch = 0;
 
             try {
-                const response = await fetch('/upload', { method: 'POST', body: formData });
+                for (let i = 0; i < files.length; i += batchSize) {
+                    currentBatch++;
+                    console.log(`Procesando lote ${currentBatch}/${totalBatches}...`);
+                    
+                    const batch = Array.from(files).slice(i, i + batchSize);
+                    const formData = new FormData();
+                    
+                    batch.forEach(file => {
+                        formData.append('files', file);
+                    });
+                    formData.append('aseguradora', aseguradora);
 
-                const contentType = response.headers.get('content-type');
-                let data;
-                if (contentType && contentType.includes('application/json')) {
-                    data = await response.json();
-                } else {
-                    const text = await response.text();
-                    throw new Error('Error del servidor: ' + (text.substring(0, 200)));
+                    const response = await fetch('/upload', { method: 'POST', body: formData });
+
+                    const contentType = response.headers.get('content-type');
+                    let data;
+                    if (contentType && contentType.includes('application/json')) {
+                        data = await response.json();
+                    } else {
+                        const text = await response.text();
+                        throw new Error('Error del servidor: ' + (text.substring(0, 200)));
+                    }
+
+                    if (data.success && data.results) {
+                        processedResults = processedResults.concat(data.results);
+                    } else if (data.error) {
+                        console.error('Error en lote:', data.error);
+                    }
                 }
 
-                if (data.success) {
-                    processedResults = data.results;
-                    displayResults(data.results);
-                    document.getElementById('downloadBtn').style.display = 'inline-block';
-                    if (hasInsurerFile) {
-                        document.getElementById('kpiBtn').style.display = 'inline-block';
-                        document.getElementById('comparisonBtn').style.display = 'inline-block';
-                    }
-                } else {
-                    alert('Error: ' + (data.error || 'Error desconocido'));
+                displayResults(processedResults);
+                document.getElementById('downloadBtn').style.display = 'inline-block';
+                if (hasInsurerFile) {
+                    document.getElementById('kpiBtn').style.display = 'inline-block';
+                    document.getElementById('comparisonBtn').style.display = 'inline-block';
                 }
             } catch (error) {
                 alert('Error al procesar: ' + error.message);
