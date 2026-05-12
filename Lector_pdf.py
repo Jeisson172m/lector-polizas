@@ -5,6 +5,7 @@ import uuid
 import tempfile
 import json
 import traceback
+import gc
 from src.services.ocr_service import OCRService
 from src.services.excel_service import ExcelService
 from src.parsers.bolivar_parser import BolívarParser
@@ -54,9 +55,17 @@ def upload_files():
             print(f'[UPLOAD] OCR extracted {len(text)} chars from {file.filename}')
             parser = BolívarParser(text)
             data = parser.parse()
+            del text
+            gc.collect()
+            
             data['ARCHIVO'] = file.filename
             results.append(data)
             print(f'[UPLOAD] Parsed {file.filename}: POLIZA={data.get("POLIZA", "N/A")}')
+            
+            del parser
+            del data
+            gc.collect()
+            
         except Exception as e:
             print(f'[UPLOAD] ERROR processing {file.filename}: {str(e)}')
             print(traceback.format_exc())
