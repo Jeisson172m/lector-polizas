@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lector de Pólizas PDF</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            padding: 40px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        h1 { color: #1F4E79; text-align: center; margin-bottom: 5px; font-size: 28px; }
+        .subtitle { color: #666; text-align: center; margin-bottom: 30px; font-size: 14px; }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            background: #fafafa;
+        }
+        .section-title {
+            color: #1F4E79;
+            font-size: 18px;
+            margin-bottom: 15px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; color: #333; font-weight: 600; margin-bottom: 8px; font-size: 14px; }
+        select, input[type="file"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        select:focus, input[type="file"]:focus { border-color: #1F4E79; outline: none; }
+        .file-list {
+            margin-top: 15px;
+            max-height: 150px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 10px;
+            background: #fff;
+        }
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px;
+            background: #f0f0f0;
+            margin-bottom: 5px;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        .btn {
+            padding: 12px 24px;
+            background: #1F4E79;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .btn:hover { background: #2a6296; }
+        .btn:disabled { background: #ccc; cursor: not-allowed; }
+        .btn-success { background: #28a745; }
+        .btn-success:hover { background: #218838; }
+        .btn-group { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px; }
+        .loading { display: none; text-align: center; margin: 20px 0; }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #1F4E79;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .results { margin-top: 30px; display: none; }
+        .results h2 { color: #1F4E79; margin-bottom: 15px; font-size: 20px; }
+        .summary { display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; }
+        .summary-item {
+            background: #1F4E79;
+            color: #fff;
+            padding: 15px 25px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .summary-item .number { font-size: 24px; font-weight: bold; }
+        .summary-item .label { font-size: 12px; opacity: 0.9; }
+        table { width: 100%; border-collapse: collapse; font-size: 11px; overflow-x: auto; display: block; }
+        th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }
+        th { background: #1F4E79; color: #fff; position: sticky; top: 0; }
+        tr:nth-child(even) { background: #f9f9f9; }
+        .insurer-info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            display: none;
+        }
+        .insurer-info.show { display: block; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Lector de Pólizas PDF</h1>
+        <p class="subtitle">Extrae información de pólizas y contrasta con Excel de la aseguradora</p>
+
+        <div class="section">
+            <div class="section-title">📋 Configuración</div>
+            <div class="form-group">
+                <label for="aseguradora">Aseguradora</label>
+                <select id="aseguradora">
+                    <option value="bolivar">Seguros Bolívar</option>
+                    <option value="suramericana">Suramericana</option>
+                    <option value="liberty">Liberty Seguros</option>
+                    <option value="mapfre">Mapfre</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">📄 Archivos PDF</div>
+            <div class="form-group">
+                <label for="files">Seleccionar archivos PDF</label>
+                <input type="file" id="files" accept=".pdf" multiple>
+            </div>
+            <div class="file-list" id="fileList" style="display: none;"></div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">📊 Excel de la Aseguradora</div>
+            <div class="form-group">
+                <label for="insurerFile">Cargar Excel de la aseguradora para contraste</label>
+                <input type="file" id="insurerFile" accept=".xlsx,.xls">
+            </div>
+            <div class="insurer-info" id="insurerInfo">
+                <strong>Archivo:</strong> <span id="insurerFileName"></span> | 
+                <strong>Registros:</strong> <span id="insurerCount"></span>
+            </div>
+        </div>
+
+        <div class="btn-group">
+            <button class="btn" id="processBtn" onclick="processFiles()">Procesar Archivos</button>
+            <button class="btn btn-success" id="downloadBtn" onclick="downloadExcel()" style="display: none;">Descargar Excel</button>
+            <button class="btn btn-success" id="comparisonBtn" onclick="downloadComparison()" style="display: none;">Descargar Comparativo</button>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p style="margin-top: 10px;">Procesando archivos...</p>
+        </div>
+
+        <div class="results" id="results">
+            <h2>Resultados</h2>
+            <div class="summary" id="summary" style="display: none;">
+                <div class="summary-item">
+                    <div class="number" id="totalProcessed">0</div>
+                    <div class="label">Archivos Procesados</div>
+                </div>
+            </div>
+            <div id="resultsTable"></div>
+        </div>
+    </div>
+
+    <script>
+        let processedResults = [];
+        let currentCacheKey = '';
+        let insurerData = [];
+        let hasInsurerFile = false;
+
+        document.getElementById('files').addEventListener('change', function(e) {
+            const fileList = document.getElementById('fileList');
+            const files = e.target.files;
+            if (files.length > 0) {
+                fileList.style.display = 'block';
+                fileList.innerHTML = '';
+                for (let i = 0; i < files.length; i++) {
+                    const fileItem = document.createElement('div');
+                    fileItem.className = 'file-item';
+                    fileItem.innerHTML = `<span>${files[i].name}</span><span>${(files[i].size / 1024).toFixed(1)} KB</span>`;
+                    fileList.appendChild(fileItem);
+                }
+            } else {
+                fileList.style.display = 'none';
+            }
+        });
+
+        document.getElementById('insurerFile').addEventListener('change', async function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('insurer_file', file);
+
+            document.getElementById('loading').style.display = 'block';
+
+            try {
+                const response = await fetch('/upload-insurer', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    currentCacheKey = data.cache_key;
+                    document.getElementById('insurerFileName').textContent = file.name;
+                    document.getElementById('insurerCount').textContent = data.count;
+                    document.getElementById('insurerInfo').classList.add('show');
+                    hasInsurerFile = true;
+                } else {
+                    alert('Error al cargar archivo: ' + data.error);
+                    hasInsurerFile = false;
+                }
+            } catch (error) {
+                alert('Error al cargar archivo: ' + error.message);
+                hasInsurerFile = false;
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        });
+
+        async function processFiles() {
+            const files = document.getElementById('files').files;
+            const aseguradora = document.getElementById('aseguradora').value;
+
+            if (files.length === 0) {
+                alert('Seleccione al menos un archivo PDF');
+                return;
+            }
+
+            const formData = new FormData();
+            for (let i = 0; i < files.length; i++) {
+                formData.append('files', files[i]);
+            }
+            formData.append('aseguradora', aseguradora);
+
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('processBtn').disabled = true;
+
+            try {
+                const response = await fetch('/upload', { method: 'POST', body: formData });
+                const data = await response.json();
+
+                if (data.success) {
+                    processedResults = data.results;
+                    displayResults(data.results);
+                    document.getElementById('downloadBtn').style.display = 'inline-block';
+                    if (hasInsurerFile) {
+                        document.getElementById('comparisonBtn').style.display = 'inline-block';
+                    }
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (error) {
+                alert('Error al procesar: ' + error.message);
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('processBtn').disabled = false;
+            }
+        }
+
+        function displayResults(results) {
+            const resultsDiv = document.getElementById('results');
+            const tableDiv = document.getElementById('resultsTable');
+            const summaryDiv = document.getElementById('summary');
+
+            document.getElementById('totalProcessed').textContent = results.length;
+            summaryDiv.style.display = 'flex';
+
+            if (results.length === 0) {
+                tableDiv.innerHTML = '<p>Sin resultados</p>';
+            } else {
+                const columns = ['ARCHIVO', 'POLIZA', 'PLACA', 'MARCA', 'LÍNEA', 'TOMADOR',
+                    'NOMBRE TOMADOR', 'ASEGURADO', 'NOMBRE ASEGURADO', 'CELULAR',
+                    'CORREO', 'FECHA INICIO VIGE', 'FECHA VENC',
+                    'VALOR ASEGURADO 2025', 'SINIESTROS', 'PRIMA NETA 2025', 'PRIMA TOTAL 2025'];
+
+                let tableHtml = '<table><thead><tr>';
+                columns.forEach(col => tableHtml += `<th>${col}</th>`);
+                tableHtml += '</tr></thead><tbody>';
+
+                results.forEach(result => {
+                    tableHtml += '<tr>';
+                    columns.forEach(col => {
+                        let value = result[col] || '';
+                        if ((col === 'FECHA INICIO VIGE' || col === 'FECHA VENC') && value) {
+                            if (value instanceof Date || (typeof value === 'string' && value.match(/\d{4}-\d{2}-\d{2}/))) {
+                                value = new Date(value).toLocaleDateString('es-ES');
+                            }
+                        }
+                        if (col === 'VALOR ASEGURADO 2025' || col === 'PRIMA NETA 2025' || col === 'PRIMA TOTAL 2025') {
+                            if (typeof value === 'number') value = value.toLocaleString('es-ES');
+                        }
+                        tableHtml += `<td>${value}</td>`;
+                    });
+                    tableHtml += '</tr>';
+                });
+
+                tableHtml += '</tbody></table>';
+                tableDiv.innerHTML = tableHtml;
+            }
+
+            resultsDiv.style.display = 'block';
+        }
+
+        async function downloadExcel() {
+            if (processedResults.length === 0) {
+                alert('No hay datos para descargar');
+                return;
+            }
+
+            try {
+                const response = await fetch('/download', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ results: processedResults })
+                });
+
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'resultados_pólizas.xlsx';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+            } catch (error) {
+                alert('Error al descargar: ' + error.message);
+            }
+        }
+
+        async function downloadComparison() {
+            if (processedResults.length === 0) {
+                alert('No hay datos para generar comparativo');
+                return;
+            }
+
+            if (!hasInsurerFile || !currentCacheKey) {
+                alert('Cargue primero el Excel de la aseguradora');
+                return;
+            }
+
+            document.getElementById('loading').style.display = 'block';
+
+            try {
+                const response = await fetch('/download-comparison', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        extracted_results: processedResults,
+                        cache_key: currentCacheKey
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Error en el servidor');
+                }
+
+                const blob = await response.blob();
+                if (blob.size === 0) {
+                    throw new Error('El archivo descargado está vacío');
+                }
+
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'comparativo_pólizas.xlsx';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            } catch (error) {
+                alert('Error al descargar: ' + error.message);
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>
