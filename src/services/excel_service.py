@@ -48,13 +48,11 @@ class ExcelService:
         for row_idx, data in enumerate(data_list, 2):
             for col_idx, col_name in enumerate(self.columns, 1):
                 value = data.get(col_name, '')
+                if 'FECHA' in col_name.upper() and isinstance(value, datetime):
+                    value = value.strftime('%d/%m/%Y')
                 cell = ws.cell(row=row_idx, column=col_idx, value=value)
                 cell.border = self._get_border()
                 cell.alignment = Alignment(horizontal='left', vertical='center')
-
-                if 'FECHA' in col_name.upper() and value:
-                    if isinstance(value, datetime):
-                        cell.number_format = 'DD/MM/YYYY'
 
         self._adjust_column_widths(ws, self.columns)
 
@@ -260,7 +258,7 @@ class ExcelService:
             'MARCA': ['MARCA'],
             'LÍNEA': ['LÍNEA', 'LINEA', 'CLASE'],
             'TOMADOR': ['TOMADOR', 'IDTOMADOR'],
-            'NOMBRE TOMADOR': ['NOMBRETOMADOR', 'NOMBRE TOMADOR', 'NOMBRETOMADOR'],
+            'NOMBRE TOMADOR': ['NOMBRETOMADOR', 'NOMBRE TOMADOR'],
             'ASEGURADO': ['ASEGURADO', 'IDASEGURADO'],
             'NOMBRE ASEGURADO': ['NOMBREASEGURADO', 'NOMBRE ASEGURADO'],
             'FECHA INICIO VIGE': ['FECHAINICIOVIGE', 'FECHA INICIO VIGE'],
@@ -326,6 +324,74 @@ class ExcelService:
             return data
         except Exception as e:
             raise Exception(f'Error al leer Excel de aseguradora: {str(e)}')
+
+    def calculate_kpis(self, extracted_data, insurer_data):
+        kpis = {
+            'total_procesados': len(extracted_data),
+            'coincidencias_exactas': 0,
+            'diferencias_encontradas': 0,
+            'sin_coincidencia_excel': 0,
+            'con_errores': 0,
+            'resumen_campos': []
+        }
+
+        header_map = self._build_insurer_header_map(insurer_data)
+
+        detalle_campos = {col: {'ok': 0, 'diferencia': 0, 'sin_datos': 0} for col in COLUMNS_TO_COMPARE}
+
+        for data in extracted_data:
+            if 'ERROR' in data:
+                kpis['con_errores'] += 1
+                continue
+
+            poliza = str(data.get('POLIZA', '')).strip()
+            placa = str(data.get('PLACA', '')).strip()
+
+            ref_data = self._find_insurer_row(insurer_data, header_map, poliza, placa)
+
+            if not ref_data:
+                kpis['sin_coincidencia_excel'] += 1
+                continue
+
+            tiene_diferencia = False
+            for col in COLUMNS_TO_COMPARE:
+                ext_val = data.get(col, '')
+                ref_val = self._get_insurer_value(ref_data, header_map, col) if ref_data else ''
+                if ref_val is None:
+                    ref_val = ''
+
+                match = self._compare_values(ext_val, ref_val)
+
+                if match == '✓':
+                    detalle_campos[col]['ok'] += 1
+                elif match == '✗':
+                    detalle_campos[col]['diferencia'] += 1
+                    tiene_diferencia = True
+                else:
+                    detalle_campos[col]['sin_datos'] += 1
+
+            if tiene_diferencia:
+                kpis['diferencias_encontradas'] += 1
+            else:
+                kpis['coincidencias_exactas'] += 1
+
+        for col in COLUMNS_TO_COMPARE:
+            total = sum(detalle_campos[col].values())
+            ok = detalle_campos[col]['ok']
+            dif = detalle_campos[col]['diferencia']
+            sin = detalle_campos[col]['sin_datos']
+
+            kpis['resumen_campos'].append({
+                'campo': col,
+                'ok': ok,
+                'diferencia': dif,
+                'sin_datos': sin,
+                'total': total,
+                'porcentaje_ok': round((ok / total * 100), 1) if total > 0 else 0,
+                'porcentaje_dif': round((dif / total * 100), 1) if total > 0 else 0
+            })
+
+        return kpis
 
     def _apply_header_style(self, ws, columns):
         header_fill = PatternFill(start_color='1F4E79', end_color='1F4E79', fill_type='solid')

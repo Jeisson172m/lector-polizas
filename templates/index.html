@@ -116,6 +116,42 @@
             display: none;
         }
         .insurer-info.show { display: block; }
+        .kpi-section { margin-top: 20px; }
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .kpi-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        .kpi-card.success { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); }
+        .kpi-card.warning { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+        .kpi-card.info { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+        .kpi-card .kpi-value { font-size: 32px; font-weight: bold; }
+        .kpi-card .kpi-label { font-size: 12px; opacity: 0.9; margin-top: 5px; }
+        .field-breakdown { margin-top: 15px; }
+        .field-breakdown h4 { color: #1F4E79; margin-bottom: 10px; }
+        .field-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 12px;
+            background: #f5f5f5;
+            border-radius: 6px;
+            margin-bottom: 5px;
+            font-size: 13px;
+        }
+        .field-item .field-name { font-weight: 600; }
+        .field-item .field-pct { font-weight: bold; }
+        .field-item .field-pct.high { color: #28a745; }
+        .field-item .field-pct.medium { color: #f0ad4e; }
+        .field-item .field-pct.low { color: #dc3545; }
     </style>
 </head>
 <body>
@@ -159,6 +195,7 @@
 
         <div class="btn-group">
             <button class="btn" id="processBtn" onclick="processFiles()">Procesar Archivos</button>
+            <button class="btn btn-success" id="kpiBtn" onclick="showKPIs()" style="display: none;">Ver KPIs</button>
             <button class="btn btn-success" id="downloadBtn" onclick="downloadExcel()" style="display: none;">Descargar Excel</button>
             <button class="btn btn-success" id="comparisonBtn" onclick="downloadComparison()" style="display: none;">Descargar Comparativo</button>
         </div>
@@ -177,6 +214,12 @@
                 </div>
             </div>
             <div id="resultsTable"></div>
+        </div>
+
+        <div class="kpi-section" id="kpiSection" style="display: none;">
+            <h2>KPIs de Calidad de Extracción</h2>
+            <div class="kpi-grid" id="kpiGrid"></div>
+            <div class="field-breakdown" id="fieldBreakdown"></div>
         </div>
     </div>
 
@@ -265,6 +308,7 @@
                     displayResults(data.results);
                     document.getElementById('downloadBtn').style.display = 'inline-block';
                     if (hasInsurerFile) {
+                        document.getElementById('kpiBtn').style.display = 'inline-block';
                         document.getElementById('comparisonBtn').style.display = 'inline-block';
                     }
                 } else {
@@ -394,6 +438,81 @@
             } finally {
                 document.getElementById('loading').style.display = 'none';
             }
+        }
+
+        async function showKPIs() {
+            if (processedResults.length === 0 || !currentCacheKey) {
+                alert('Procese archivos y cargue el Excel de la aseguradora primero');
+                return;
+            }
+
+            document.getElementById('loading').style.display = 'block';
+
+            try {
+                const response = await fetch('/get-kpis', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        extracted_results: processedResults,
+                        cache_key: currentCacheKey
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    displayKPIs(data.kpis);
+                } else {
+                    alert('Error al obtener KPIs: ' + data.error);
+                }
+            } catch (error) {
+                alert('Error al obtener KPIs: ' + error.message);
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        function displayKPIs(kpis) {
+            const kpiSection = document.getElementById('kpiSection');
+            const kpiGrid = document.getElementById('kpiGrid');
+            const fieldBreakdown = document.getElementById('fieldBreakdown');
+
+            let gridHtml = `
+                <div class="kpi-card info">
+                    <div class="kpi-value">${kpis.total_procesados || 0}</div>
+                    <div class="kpi-label">Archivos Procesados</div>
+                </div>
+                <div class="kpi-card success">
+                    <div class="kpi-value">${kpis.porcentaje_coincidencia || 0}%</div>
+                    <div class="kpi-label">% Coincidencia Total</div>
+                </div>
+                <div class="kpi-card warning">
+                    <div class="kpi-value">${kpis.total_no_coincidentes || 0}</div>
+                    <div class="kpi-label">Campos Sin Coincidencia</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-value">${kpis.total_comparados || 0}</div>
+                    <div class="kpi-label">Campos Comparados</div>
+                </div>
+            `;
+            kpiGrid.innerHTML = gridHtml;
+
+            if (kpis.resumen_campos && kpis.resumen_campos.length > 0) {
+                let breakdownHtml = '<h4>Desglose por Campo</h4>';
+                kpis.resumen_campos.forEach(item => {
+                    let pctClass = item.porcentaje >= 80 ? 'high' : (item.porcentaje >= 50 ? 'medium' : 'low');
+                    breakdownHtml += `
+                        <div class="field-item">
+                            <span class="field-name">${item.campo}</span>
+                            <span class="field-pct ${pctClass}">${item.porcentaje}% (${item.coincidentes}/${item.total})</span>
+                        </div>
+                    `;
+                });
+                fieldBreakdown.innerHTML = breakdownHtml;
+            }
+
+            kpiSection.style.display = 'block';
+            kpiSection.scrollIntoView({ behavior: 'smooth' });
         }
     </script>
 </body>

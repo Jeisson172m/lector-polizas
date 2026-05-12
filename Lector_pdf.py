@@ -1,9 +1,9 @@
+from flask import Flask, render_template, request, jsonify, send_file
+from flask_cors import CORS
 import os
 import uuid
 import tempfile
 import json
-from flask import Flask, render_template, request, jsonify, send_file
-from flask_cors import CORS
 from src.services.ocr_service import OCRService
 from src.services.excel_service import ExcelService
 from src.parsers.bolivar_parser import BolívarParser
@@ -81,6 +81,21 @@ def upload_insurer_excel():
         insurer_cache.pop(cache_key, None)
         return jsonify({'error': str(e)}), 400
 
+@app.route('/get-kpis', methods=['POST'])
+def get_kpis():
+    data = request.get_json()
+    extracted_results = data.get('extracted_results', [])
+    cache_key = data.get('cache_key', '')
+
+    insurer_data = []
+    if cache_key and cache_key in insurer_cache:
+        filepath = insurer_cache[cache_key]
+        if os.path.exists(filepath):
+            insurer_data = excel_service.load_insurer_excel(filepath)
+
+    kpis = excel_service.calculate_kpis(extracted_results, insurer_data)
+    return jsonify({'success': True, 'kpis': kpis})
+
 @app.route('/download', methods=['POST'])
 def download_excel():
     data = request.get_json()
@@ -126,7 +141,6 @@ def download_comparison():
     except Exception as e:
         import traceback
         print(f'Error in download_comparison: {str(e)}')
-        print(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
