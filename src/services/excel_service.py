@@ -78,8 +78,8 @@ class ExcelService:
         for row_idx, data in enumerate(extracted_data, 2):
             for col_idx, col_name in enumerate(COLUMNS_ALL, 1):
                 value = data.get(col_name, '')
-                if 'FECHA' in col_name.upper() and isinstance(value, datetime):
-                    value = value.strftime('%d/%m/%Y')
+                if 'FECHA' in col_name.upper():
+                    value = self._format_value(value, col_name)
                 cell = ws.cell(row=row_idx, column=col_idx, value=value)
                 cell.border = self._get_border()
                 cell.alignment = Alignment(horizontal='left', vertical='center')
@@ -190,24 +190,13 @@ class ExcelService:
             return ''
 
         if 'FECHA' in col_name.upper():
+            val_str = str(val)
             if isinstance(val, datetime):
                 return val.strftime('%d/%m/%Y')
 
-            val_str = str(val)
-            import re
-            date_match = re.search(r'\w+,\s+(\d+)\s+(\w+)\s+(\d{4})', val_str)
-            if date_match:
-                months = {'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04', 'May': '05', 'Jun': '06',
-                         'Jul': '07', 'Aug': '08', 'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'}
-                day = date_match.group(1).zfill(2)
-                month_str = date_match.group(2)
-                year = date_match.group(3)
-                month = months.get(month_str, '01')
-                return f'{day}/{month}/{year}'
-
-            for fmt in ['%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y']:
+            for fmt in ['%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d', '%d.%m.%Y']:
                 try:
-                    return datetime.strptime(val_str.split()[0], fmt).strftime('%d/%m/%Y')
+                    return datetime.strptime(val_str.split()[0] if ' ' in val_str else val_str, fmt).strftime('%d/%m/%Y')
                 except:
                     pass
             return val_str
@@ -276,14 +265,37 @@ class ExcelService:
         return None
 
     def _compare_values(self, val1, val2):
-        s1 = self._normalize_value(val1).upper()
-        s2 = self._normalize_value(val2).upper()
+        s1 = self._normalize_value(val1).upper().strip()
+        s2 = self._normalize_value(val2).upper().strip()
 
-        if s2 in ['#N/D', 'N/D', '', 'NONE', '-']:
+        if s2 in ['#N/D', 'N/D', '', 'NONE', '-', 'N/A']:
             return '-'
 
         if s1 == s2:
             return '✓'
+
+        date_formats = ['%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d', '%d.%m.%Y']
+        val1_date = None
+        val2_date = None
+
+        if '/' in s1 or '-' in s1 or '.' in s1:
+            for fmt in date_formats:
+                try:
+                    val1_date = datetime.strptime(s1, fmt)
+                    break
+                except:
+                    continue
+
+        for fmt in date_formats:
+            try:
+                val2_date = datetime.strptime(s2, fmt)
+                break
+            except:
+                continue
+
+        if val1_date and val2_date:
+            if val1_date == val2_date:
+                return '✓'
 
         try:
             n1 = float(s1.replace('$', '').replace(',', '').replace('.', ''))
@@ -292,15 +304,6 @@ class ExcelService:
                 return '✓'
         except:
             pass
-
-        if isinstance(val1, datetime) and val1 and isinstance(val2, str):
-            try:
-                if '/' in s2:
-                    val2_date = datetime.strptime(s2, '%d/%m/%Y')
-                    if abs((val1 - val2_date).days) < 5:
-                        return '✓'
-            except:
-                pass
 
         return '✗'
 

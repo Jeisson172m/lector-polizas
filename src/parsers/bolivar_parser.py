@@ -140,19 +140,36 @@ class BolívarParser:
                                     break
 
     def _extract_fechas(self):
-        inicio_match = re.search(r'(?:DESDE|OBSERVACIONES:)\s*(\d{2}/\d{2}/\d{4})', self.text, re.IGNORECASE)
-        if inicio_match:
-            self.data['FECHA INICIO VIGE'] = self._parse_date(inicio_match.group(1))
+        patterns_inicio = [
+            r'(?:DESDE|OBSERVACIONES:)\s*(\d{2}/\d{2}/\d{4})',
+            r'(\d{2}/\d{2}/\d{4})\s*-?\s*HASTA',
+            r'INICIO.*?(\d{2}/\d{2}/\d{4})',
+        ]
+        for pattern in patterns_inicio:
+            inicio_match = re.search(pattern, self.text, re.IGNORECASE)
+            if inicio_match:
+                self.data['FECHA INICIO VIGE'] = self._parse_date(inicio_match.group(1))
+                break
 
-        fin_match = re.search(r'HASTA\s+VIGENCIA\s*(\d{2}/\d{2}/\d{4})', self.text, re.IGNORECASE)
-        if fin_match:
-            self.data['FECHA VENC'] = self._parse_date(fin_match.group(1))
+        patterns_fin = [
+            r'HASTA\s+VIGENCIA\s*(\d{2}/\d{2}/\d{4})',
+            r'Hasta.*?(\d{2}/\d{2}/\d{4})',
+            r'FIN.*?(\d{2}/\d{2}/\d{4})',
+        ]
+        for pattern in patterns_fin:
+            fin_match = re.search(pattern, self.text, re.IGNORECASE)
+            if fin_match:
+                self.data['FECHA VENC'] = self._parse_date(fin_match.group(1))
+                break
 
     def _parse_date(self, date_str):
-        try:
-            return datetime.strptime(date_str.strip(), '%d/%m/%Y')
-        except:
-            return date_str
+        for fmt in ['%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d']:
+            try:
+                dt = datetime.strptime(date_str.strip(), fmt)
+                return dt.strftime('%d/%m/%Y')
+            except:
+                continue
+        return date_str
 
     def _extract_valor_asegurado(self):
         valor_comercial = re.search(r'VALOR\s*COMERCIAL\*\s*\$\s*([\d,.]+)', self.text, re.IGNORECASE)
