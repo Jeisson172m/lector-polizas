@@ -370,7 +370,10 @@ class ExcelService:
                 if ref_val is None:
                     ref_val = ''
 
-                match = self._compare_values(ext_val, ref_val)
+                ext_display = self._format_value(ext_val, col)
+                ref_display = self._format_value(ref_val, col)
+
+                match = self._compare_values(ext_display, ref_display)
 
                 if match == '✓':
                     detalle_campos[col]['ok'] += 1
