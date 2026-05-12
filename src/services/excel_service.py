@@ -152,7 +152,10 @@ class ExcelService:
                     if ref_val is None:
                         ref_val = ''
 
-                match = self._compare_values(ext_val, ref_val)
+                ext_display = self._format_value(ext_val, col_name)
+                ref_display = self._format_value(ref_val, col_name)
+                
+                match = self._compare_values(ext_display, ref_display)
 
                 label_cell = ws.cell(row=current_row, column=1, value=col_name)
                 label_cell.border = thin_border
@@ -190,15 +193,18 @@ class ExcelService:
             return ''
 
         if 'FECHA' in col_name.upper():
-            val_str = str(val)
             if isinstance(val, datetime):
                 return val.strftime('%d/%m/%Y')
-
+            
+            val_str = str(val).strip()
+            
             for fmt in ['%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d', '%d.%m.%Y']:
                 try:
-                    return datetime.strptime(val_str.split()[0] if ' ' in val_str else val_str, fmt).strftime('%d/%m/%Y')
+                    parsed = datetime.strptime(val_str.split()[0] if ' ' in val_str else val_str, fmt)
+                    return parsed.strftime('%d/%m/%Y')
                 except:
-                    pass
+                    continue
+            
             return val_str
 
         if any(x in col_name.upper() for x in ['VALOR', 'PRIMA']):
@@ -275,27 +281,28 @@ class ExcelService:
             return '✓'
 
         date_formats = ['%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d', '%d.%m.%Y']
-        val1_date = None
-        val2_date = None
-
-        if '/' in s1 or '-' in s1 or '.' in s1:
+        
+        try:
+            val1_date = None
             for fmt in date_formats:
                 try:
                     val1_date = datetime.strptime(s1, fmt)
                     break
                 except:
                     continue
-
-        for fmt in date_formats:
-            try:
-                val2_date = datetime.strptime(s2, fmt)
-                break
-            except:
-                continue
-
-        if val1_date and val2_date:
-            if val1_date == val2_date:
+            
+            val2_date = None
+            for fmt in date_formats:
+                try:
+                    val2_date = datetime.strptime(s2, fmt)
+                    break
+                except:
+                    continue
+            
+            if val1_date and val2_date and val1_date == val2_date:
                 return '✓'
+        except:
+            pass
 
         try:
             n1 = float(s1.replace('$', '').replace(',', '').replace('.', ''))
