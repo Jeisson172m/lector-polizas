@@ -3,9 +3,10 @@ services:
     name: lector-polizas
     region: oregon
     plan: free
+    runtime: python
     buildCommand: |
       apt-get update && apt-get install -y poppler-utils tesseract-ocr tesseract-ocr-spa && pip install --no-cache-dir -r requirements.txt
-    startCommand: gunicorn Lector_pdf:app --bind 0.0.0.0:$PORT
+    startCommand: gunicorn Lector_pdf:app --bind 0.0.0.0:$PORT --timeout 120
     healthCheckPath: /
     envVars:
       - key: PYTHON_VERSION
