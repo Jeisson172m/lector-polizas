@@ -71,6 +71,27 @@ Frontend (HTML/CSS/JS) ──► Flask API ──► OCR Service (Tesseract + pd
 
 ---
 
+## Correcciones del Parser (Mayo 2026)
+
+### Problemas Resueltos
+
+| Campo | Problema Anterior | Solución Implementada |
+|-------|------------------|---------------------|
+| MARCA | Capturaba "SEGURO" de texto "DEL SEGURO" | Tomar el ÚLTIMO match de "MARCA" (PDFs pueden tener texto engañoso al inicio) |
+| LÍNEA | Capturaba "DE" del mismo texto | Relacionado con fix de MARCA |
+| FECHA VENC | No capturaba cuando formato era "VIGENCIA DEL SEGURO dd/mm/aaaa" | Nuevo patrón: `VIGENCIA\s+DEL\s+SEGURO\s*(\d{2}/\d{2}/\d{4})` |
+| VALOR ASEGURADO 2025 | No capturaba formato "$ 80,500,000" | Nuevo patrón: `VALOR COMERCIAL.+?\$ ([0-9,]+)` |
+| PRIMA NETA/TOTAL | No capturaba con formato diferente | Patrones actualizados para variaciones |
+
+### Cambios Clave en bolivar_parser.py
+
+1. `_extract_marca_linea()`: Ahora usa `re.finditer()` y toma el match más reciente para evitar falsos positivos del OCR
+2. `_extract_fechas()`: Añadido patrón para "VIGENCIA DEL SEGURO dd/mm/aaaa"
+3. `_extract_valor_asegurado()`: Patrones mejorados para capturar con o sin asterisco
+4. `_extract_primas()`: Captura "VALOR DE LA PRIMA" y "TOTAL A PAGAR"
+
+---
+
 ## Campos Extraídos (24)
 
 ```

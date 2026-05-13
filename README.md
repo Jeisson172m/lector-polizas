@@ -53,24 +53,24 @@ Lector de Pólizas PDF automatiza la extracción de datos de pólizas Bolívar m
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                           FRONTEND (Cliente)                            │
 │                    HTML5 + CSS3 + JavaScript vanilla                    │
-│                      Diseño responsivo, sin dependencias                  │
+│                      Diseño responsivo, sin dependencias                │
 └─────────────────────────────────┬───────────────────────────────────────┘
                                   │ HTTP/HTTPS
                                   ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                           BACKEND (Servidor)                            │
 │                      Flask 3.0 + Python 3.11                            │
-│                                                                             │
+│                                                                         │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
 │  │ OCR Service  │  │ Parser       │  │ Excel        │  │ Cache        │ │
 │  │ (Tesseract)  │  │ (Bolívar)    │  │ Service      │  │ (Insurer)    │ │
 │  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘ │
-│         │                │                │                │              │
-│         ▼                ▼                ▼                ▼              │
-│  ┌─────────────────────────────────────────────────────────────────────┐ │
-│  │                    pdfplumber (extracción texto)                     │ │
-│  │                    pdf2image + PIL (imágenes para OCR)               │ │
-│  └─────────────────────────────────────────────────────────────────────┘ │
+│         │                │                │                │            │
+│         ▼                ▼                ▼                ▼            │
+│  ┌─────────────────────────────────────────────────────────────────────┐│
+│  │                    pdfplumber (extracción texto)                    ││
+│  │                    pdf2image + PIL (imágenes para OCR)              ││
+│  └─────────────────────────────────────────────────────────────────────┘│
 └─────────────────────────────────────────────────────────────────────────┘
                                   │
                                   ▼
@@ -139,7 +139,7 @@ Lector de Pólizas PDF automatiza la extracción de datos de pólizas Bolívar m
                     PROCESAMIENTO POR LOTES (BATCH)
 
     ┌──────────────────────────────────────────────────────────────────────┐
-    │                     FRONTEND - Lotes de 5 PDFs                        │
+    │                     FRONTEND - Lotes de 5 PDFs                       │
     └──────────────────────────────────────────────────────────────────────┘
 
     Archivo 1 ─┐
@@ -148,15 +148,15 @@ Lector de Pólizas PDF automatiza la extracción de datos de pólizas Bolívar m
     Archivo 4 ─┤                    │
     Archivo 5 ─┘                    ▼
                                ┌──────────────────┐
-    Archivo 6 ─┐                 │  Concatenar      │
-    Archivo 7 ─┤                 │  Resultados      │
+    Archivo 6 ─┐               │  Concatenar      │
+    Archivo 7 ─┤               │  Resultados      │
     Archivo 8 ─┼── Lote 2 ──▶ Request 2 ──▶ Procesa ──▶ Resultados 1+2
     Archivo 9 ─┤                    │
-    Archivo 10 ─┘                    ▼
+    Archivo10 ─┘                    ▼
                                ┌──────────────────┐
-        ...                     │  Almacena todos  │
-        ...                     │  los resultados  │
-        ...                     └──────────────────┘
+        ...                    │  Almacena todos  │
+        ...                    │  los resultados  │
+        ...                    └──────────────────┘
 
 ═══════════════════════════════════════════════════════════════════════════════
 
@@ -171,15 +171,15 @@ Lector de Pólizas PDF automatiza la extracción de datos de pólizas Bolívar m
     │ ...               │           │ ...               │
     └─────────┬─────────┘           └─────────┬─────────┘
               │                               │
-              │        ┌───────────────────────┤
-              │        │                       │
-              ▼        ▼                       ▼
+              │       ┌───────────────────────┤
+              │       │                       │
+              ▼       ▼                       ▼
     ┌─────────────────────────────────────────────────────┐
-    │                  Excel Service                       │
+    │                  Excel Service                      │
     │                                                     │
-    │  _normalize_value()  ──▶  Normalización strings      │
-    │  _format_value()     ──▶  Formato consistente        │
-    │  _compare_values()   ──▶  Comparación inteligente    │
+    │  _normalize_value()  ──▶  Normalización strings    │
+    │  _format_value()     ──▶  Formato consistente      │
+    │  _compare_values()   ──▶  Comparación inteligente  │
     │                                                     │
     │  Resultados: ✓ (match) | ✗ (diferencia) | - (sin dato)│
     └─────────────────────────────────────────────────────┘

@@ -62,11 +62,23 @@ class BolívarParser:
             self.data['PLACA'] = match.group(1).upper()
 
     def _extract_marca_linea(self):
-        match = re.search(r'MARCA\s+([A-Z]+)\s+([^\n]+?)(?:\s*\d{4}\s|MODELO|TIPO|COLOR|$)', self.text, re.IGNORECASE)
-        if match:
-            self.data['MARCA'] = match.group(1).strip()
-            self.data['LÍNEA'] = match.group(2).strip()
-            return
+        matches = list(re.finditer(r'MARCA\s+([A-Z]{2,})\s+([A-Za-z]+)', self.text, re.IGNORECASE))
+        for match in reversed(matches):
+            marca = match.group(1).strip()
+            linea = match.group(2).strip()
+            if marca not in ['DEL', 'DATOS', 'SEGURO', 'EL', 'LA', 'LOS', 'LAS']:
+                self.data['MARCA'] = marca
+                self.data['LÍNEA'] = linea
+                return
+
+        matches = list(re.finditer(r'MARCA\s+([A-Z]{2,})\s+([A-Za-z]+)', self.text, re.IGNORECASE))
+        for match in reversed(matches):
+            marca = match.group(1).strip()
+            linea = match.group(2).strip()
+            if len(marca) >= 2 and len(linea) >= 2:
+                self.data['MARCA'] = marca
+                self.data['LÍNEA'] = linea
+                return
 
         match = re.search(r'MARCA\s+([A-Z]+)\s+([^\n]+)', self.text, re.IGNORECASE)
         if match:
@@ -86,7 +98,7 @@ class BolívarParser:
                 for j in range(i, min(i + 6, len(lines))):
                     sig_line = lines[j].strip()
 
-                    match = re.match(r'^NOMBRE:\s*([A-Z][A-Za-zÁÉÍÓÚÑ\s\.]+?)\s*$', sig_line)
+                    match = re.match(r'^NOMBRE:\s*([A-Z][A-Za-zÁÉÍÓÚÑ\s\.]+)', sig_line)
                     if match:
                         nombre_tomador = match.group(1).strip()
                         if j + 1 < len(lines):
@@ -140,21 +152,33 @@ class BolívarParser:
                                     break
 
     def _extract_fechas(self):
-        patterns_inicio = [
-            r'(?:DESDE|OBSERVACIONES:)\s*(\d{2}/\d{2}/\d{4})',
-            r'(\d{2}/\d{2}/\d{4})\s*-?\s*HASTA',
-            r'INICIO.*?(\d{2}/\d{2}/\d{4})',
-        ]
-        for pattern in patterns_inicio:
-            inicio_match = re.search(pattern, self.text, re.IGNORECASE)
-            if inicio_match:
-                self.data['FECHA INICIO VIGE'] = self._parse_date(inicio_match.group(1))
-                break
+        # Buscar en línea después de OBSERVACIONES
+        lines = self.text.split('\n')
+        for i, line in enumerate(lines):
+            if 'OBSERVACIONES' in line.upper() and i + 1 < len(lines):
+                next_line = lines[i + 1].strip()
+                match = re.search(r'(\d{2}/\d{2}/\d{4})', next_line)
+                if match:
+                    self.data['FECHA INICIO VIGE'] = self._parse_date(match.group(1))
+                    break
+        else:
+            patterns_inicio = [
+                r'DESDE\s*(\d{2}/\d{2}/\d{4})',
+                r'OBSERVACIONES:.*?(\d{2}/\d{2}/\d{4})',
+                r'(\d{2}/\d{2}/\d{4})\s*-?\s*HASTA',
+            ]
+            for pattern in patterns_inicio:
+                inicio_match = re.search(pattern, self.text, re.IGNORECASE)
+                if inicio_match:
+                    self.data['FECHA INICIO VIGE'] = self._parse_date(inicio_match.group(1))
+                    break
 
         patterns_fin = [
+            r'VIGENCIA\s+DEL\s+SEGURO\s*(\d{2}/\d{2}/\d{4})',
+            r'HASTA\s+(\d{2}/\d{2}/\d{4})',
             r'HASTA\s+VIGENCIA\s*(\d{2}/\d{2}/\d{4})',
             r'Hasta.*?(\d{2}/\d{2}/\d{4})',
-            r'FIN.*?(\d{2}/\d{2}/\d{4})',
+            r'VIGENCIA\s*(\d{2}/\d{2}/\d{4})',
         ]
         for pattern in patterns_fin:
             fin_match = re.search(pattern, self.text, re.IGNORECASE)
@@ -172,22 +196,31 @@ class BolívarParser:
         return date_str
 
     def _extract_valor_asegurado(self):
-        valor_comercial = re.search(r'VALOR\s*COMERCIAL\*\s*\$\s*([\d,.]+)', self.text, re.IGNORECASE)
-        if valor_comercial:
-            valor_str = valor_comercial.group(1).replace('.', '').replace(',', '')
-            try:
-                self.data['VALOR ASEGURADO 2025'] = float(valor_str)
-            except:
-                self.data['VALOR ASEGURADO 2025'] = valor_str
+        patterns = [
+            r'VALORCOMERCIAL.+?\$ ([0-9,]+)',
+            r'VALOR COMERCIAL.+?\$ ([0-9,]+)',
+            r'VALORASEGURADODEL.+?\$ ([0-9,]+)',
+            r'VALOR ASEGURADO DEL BIEN.+?\$ ([0-9,]+)',
+        ]
+        for pattern in patterns:
+            valor_match = re.search(pattern, self.text, re.IGNORECASE)
+            if valor_match:
+                valor_str = valor_match.group(1).replace('.', '').replace(',', '')
+                try:
+                    self.data['VALOR ASEGURADO 2025'] = float(valor_str)
+                    return
+                except:
+                    self.data['VALOR ASEGURADO 2025'] = valor_str
+                    return
 
     def _extract_primas(self):
-        prima_neta_match = re.search(r'VALOR\s*DE\s*LA?\s*PRIMA[:\s]*\$\s*([\d,.]+)', self.text, re.IGNORECASE)
+        prima_neta_match = re.search(r'VALORDELAPRIMA.+?\$ ([0-9,]+)', self.text, re.IGNORECASE)
         if not prima_neta_match:
-            prima_neta_match = re.search(r'VALOR\s*DE\s*LAPRIMA\s*\$\s*([\d,.]+)', self.text, re.IGNORECASE)
+            prima_neta_match = re.search(r'VALOR DE LA PRIMA.+?\$ ([0-9,]+)', self.text, re.IGNORECASE)
 
-        total_pagar_match = re.search(r'TOTALAPAGAR\s*\$\s*([\d,.]+)', self.text, re.IGNORECASE)
+        total_pagar_match = re.search(r'TOTALAPAGAR.+?\$ ([0-9,]+)', self.text, re.IGNORECASE)
         if not total_pagar_match:
-            total_pagar_match = re.search(r'TOTAL\s*A\s*PAGAR\s*\$\s*([\d,.]+)', self.text, re.IGNORECASE)
+            total_pagar_match = re.search(r'TOTAL A PAGAR.+?\$ ([0-9,]+)', self.text, re.IGNORECASE)
 
         if prima_neta_match:
             valor_str = prima_neta_match.group(1).replace('.', '').replace(',', '')
