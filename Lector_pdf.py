@@ -18,7 +18,7 @@ app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-ocr_service = OCRService(dpi=300)
+ocr_service = OCRService()
 excel_service = ExcelService()
 insurer_cache = {}
 

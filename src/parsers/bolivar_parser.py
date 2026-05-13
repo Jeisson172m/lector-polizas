@@ -11,13 +11,11 @@ class BolívarParser:
         self.data = {
             'POLIZA': '', 'PLACA': '', 'MARCA': '', 'LÍNEA': '',
             'TOMADOR': '', 'NOMBRE TOMADOR': '', 'ASEGURADO': '',
-            'NOMBRE ASEGURADO': '', 'CELULAR': '', 'CORREO': '',
-            'NIT ONEROSO': '', 'BENEFICIARIO ONEROSO': '',
+            'NOMBRE ASEGURADO': '',
             'FECHA INICIO VIGE': '', 'FECHA VENC': '',
-            'VALOR ASEGURADO 2024': '', 'VALOR ASEGURADO 2025': '',
-            'SINIESTROS': 'NO', 'PRIMA NETA 2024': '', 'PRIMA TOTAL 2024': '',
-            'PRIMA NETA 2025': '', 'PRIMA TOTAL 2025': '',
-            'VARIACIÓN PRIMA NETA': '', 'VARIACIÓN PRIMA TOTAL': ''
+            'VALOR ASEGURADO 2025': '',
+            'SINIESTROS': 'NO',
+            'PRIMA NETA 2025': '', 'PRIMA TOTAL 2025': ''
         }
 
     def parse(self):

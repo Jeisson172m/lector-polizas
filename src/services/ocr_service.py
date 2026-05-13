@@ -51,7 +51,7 @@ class OCRService:
                 dpi=self.dpi,
                 fmt='png',
                 thread_count=1,
-                max_section=3
+                last_page=3
             )
             del pdf_bytes
             
